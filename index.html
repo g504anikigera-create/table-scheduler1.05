@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>テーブル配置スケジューラー</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --font-sans:-apple-system,BlinkMacSystemFont,'Segoe UI','Hiragino Sans',sans-serif;
+}
+body{font-family:var(--font-sans);font-size:13px;color:#1a1a1a;background:#f3f4f6;min-height:100vh}
+header{background:#fff;border-bottom:1px solid #e5e7eb;padding:12px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+header h1{font-size:15px;font-weight:600}
+header .subtitle{font-size:11px;color:#6b7280}
+.app{padding:14px;max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.top-section{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:680px){.top-section{grid-template-columns:1fr}}
+.panel{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px}
+.panel h3{font-size:13px;font-weight:500;margin-bottom:10px;color:#6b7280}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.form-row{display:flex;flex-direction:column;gap:3px}
+.form-row label{font-size:11px;color:#6b7280}
+.form-row input{width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;background:#fff}
+.form-row input:focus{outline:2px solid #3b82f6;outline-offset:1px;border-color:transparent}
+.time-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.time-row input[type=time]{padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px}
+.time-row label{font-size:11px;color:#6b7280;white-space:nowrap}
+.name-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.name-row input{flex:1;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px}
+.name-row label{font-size:11px;color:#6b7280;white-space:nowrap}
+.btn-primary{padding:7px 14px;background:#1a1a1a;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer}
+.btn-primary:hover{background:#333}
+.btn-primary:disabled{background:#9ca3af;cursor:not-allowed}
+.btn-secondary{padding:6px 12px;background:#fff;color:#1a1a1a;border:1px solid #d1d5db;border-radius:6px;font-size:12px;cursor:pointer}
+.btn-secondary:hover{background:#f9fafb}
+.btn-danger{padding:2px 8px;background:#fff;color:#dc2626;border:1px solid #fca5a5;border-radius:6px;font-size:10px;cursor:pointer}
+.reservations-list{display:flex;flex-direction:column;gap:6px;max-height:190px;overflow-y:auto}
+.res-item{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#f9fafb;border-radius:6px;border:1px solid #e5e7eb}
+.res-badge{padding:2px 8px;border-radius:4px;font-size:10px;font-weight:500;white-space:nowrap}
+.res-name{flex:1;font-weight:500;font-size:12px}
+.res-detail{font-size:11px;color:#6b7280;white-space:nowrap}
+/* OCRパネル */
+.ocr-panel{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px}
+.ocr-panel h3{font-size:13px;font-weight:500;margin-bottom:10px;color:#6b7280}
+.ocr-drop-zone{border:2px dashed #d1d5db;border-radius:8px;padding:24px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;position:relative}
+.ocr-drop-zone:hover,.ocr-drop-zone.drag-over{border-color:#3b82f6;background:#eff6ff}
+.ocr-drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.ocr-drop-text{font-size:12px;color:#6b7280;pointer-events:none}
+.ocr-drop-text strong{display:block;font-size:13px;color:#1a1a1a;margin-bottom:4px}
+.ocr-preview{margin-top:8px;max-width:100%;max-height:160px;border-radius:6px;object-fit:contain;display:none}
+.ocr-status{font-size:11px;margin-top:8px;padding:6px 10px;border-radius:6px;display:none}
+.ocr-status.loading{background:#eff6ff;color:#1e40af}
+.ocr-status.success{background:#f0fdf4;color:#166534}
+.ocr-status.error{background:#fef2f2;color:#dc2626}
+.ocr-result-list{margin-top:10px;flex-direction:column;gap:4px;max-height:220px;overflow-y:auto;display:none}
+.ocr-result-item{display:flex;align-items:center;gap:6px;padding:5px 8px;background:#f9fafb;border-radius:5px;border:1px solid #e5e7eb;font-size:11px}
+.ocr-result-item label{flex:1;font-weight:500}
+.ocr-result-item input[type=checkbox]{accent-color:#1a1a1a}
+.ocr-import-row{margin-top:8px;display:none;gap:8px}
+/* スケジュール */
+.schedule-section{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px}
+.schedule-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.schedule-header h3{font-size:13px;font-weight:500;color:#6b7280}
+.timeline-wrap{overflow-x:auto;margin-top:4px}
+.timeline{position:relative;min-width:800px}
+.time-axis{display:flex;margin-left:165px;border-bottom:1px solid #d1d5db;padding-bottom:4px;margin-bottom:2px}
+.time-slot-hdr{font-size:10px;color:#6b7280;text-align:center;flex:0 0 60px}
+.table-rows{display:flex;flex-direction:column;gap:2px}
+.table-row{display:flex;align-items:center;min-height:32px}
+.table-label{width:165px;flex-shrink:0;display:flex;align-items:center;gap:6px;padding-right:8px}
+.table-label-name{font-size:11px;font-weight:500}
+.table-label-tags{display:flex;gap:3px;flex-wrap:wrap}
+.tag{font-size:9px;padding:1px 5px;border-radius:3px}
+.tag-sofa{background:#E1F5EE;color:#0F6E56}
+.tag-2p{background:#E6F1FB;color:#185FA5}
+.tag-4p{background:#FAEEDA;color:#854F0B}
+.tag-6p{background:#FAECE7;color:#993C1D}
+.table-track{position:relative;height:28px;background:#f9fafb;border-radius:4px;flex:0 0 auto;border:1px solid #e5e7eb;overflow:visible}
+.grid-line{position:absolute;top:-3px;bottom:-3px;width:1px;background:#e5e7eb;pointer-events:none;z-index:1}
+.grid-line-hour{background:#d1d5db}
+.sep-row{background:#e5e7eb;height:1px;margin:4px 0 4px 165px}
+.grp-label{font-size:10px;color:#6b7280;padding:4px 0 2px;font-weight:600}
+.res-bar{position:absolute;top:2px;height:24px;border-radius:4px;cursor:grab;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 6px;user-select:none;z-index:2}
+.res-bar:hover{opacity:.85;z-index:10}
+.res-bar.dragging{opacity:.4;cursor:grabbing;z-index:100}
+.c1{background:#B5D4F4;color:#0C447C}.c2{background:#9FE1CB;color:#085041}
+.c3{background:#F5C4B3;color:#712B13}.c4{background:#FAC775;color:#633806}
+.c5{background:#C0DD97;color:#27500A}.c6{background:#F4C0D1;color:#72243E}
+.c7{background:#CED0F6;color:#3C3489}.c8{background:#F7C1C1;color:#791F1F}
+.sofa-warn{outline:2px dashed #f59e0b;outline-offset:1px}
+.over-cap-warn{outline:2px dashed #ef4444;outline-offset:1px}
+.sofa-notice{background:#fffbeb;border:1px solid #fcd34d;color:#92400e;padding:8px 12px;border-radius:6px;font-size:11px;margin-top:6px;display:none}
+.drag-hint{font-size:10px;color:#9ca3af;text-align:right;margin-top:2px}
+.unplaced-section{background:#fff;border:1px solid #fca5a5;border-radius:10px;padding:14px}
+.unplaced-section h3{font-size:13px;font-weight:500;color:#dc2626;margin-bottom:8px}
+.unplaced-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.unplaced-bar{padding:4px 12px;border-radius:4px;font-size:11px;font-weight:500;cursor:grab;border:1.5px dashed currentColor}
+.stats-row{display:flex;gap:8px;flex-wrap:wrap}
+.stat-card{background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:10px 14px;flex:1;min-width:80px}
+.stat-card .val{font-size:20px;font-weight:600}
+.stat-card .lbl{font-size:10px;color:#6b7280}
+.tooltip{position:fixed;background:#1a1a1a;color:#fff;padding:7px 11px;border-radius:8px;font-size:11px;pointer-events:none;z-index:9999;display:none;max-width:240px;line-height:1.7;box-shadow:0 4px 12px rgba(0,0,0,.3)}
+.add-btn-row{display:flex;justify-content:flex-end;margin-top:10px}
+.hint-box{font-size:10px;color:#6b7280;margin-top:10px;padding:7px 9px;background:#f9fafb;border-radius:6px;line-height:1.8;border:1px solid #e5e7eb}
+.festival-banner{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;transition:background .2s,border-color .2s}
+.festival-banner.active{background:#FAEEDA;border-color:#EF9F27}
+.festival-label{font-size:13px;font-weight:500;flex:1}
+.festival-sub{font-size:11px;color:#6b7280;font-weight:400;display:block;margin-top:2px}
+.toggle{position:relative;width:44px;height:24px;cursor:pointer;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0;position:absolute}
+.toggle-track{position:absolute;inset:0;border-radius:12px;background:#d1d5db;transition:background .2s}
+.toggle input:checked+.toggle-track{background:#EF9F27}
+.toggle-thumb{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.toggle input:checked~.toggle-thumb{transform:translateX(20px)}
+.cap-badge{font-size:10px;padding:2px 7px;border-radius:4px;background:#FAEEDA;color:#633806;font-weight:600;margin-left:6px}
+.toggle-status{font-size:11px;color:#6b7280;margin-right:4px;font-weight:500}
+.spinner{display:inline-block;width:12px;height:12px;border:2px solid #93c5fd;border-top-color:#1d4ed8;border-radius:50%;animation:spin .7s linear infinite;margin-right:6px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>🍽 テーブル配置スケジューラー</h1>
+    <div class="subtitle">予約に基づいてテーブルを自動配置 · ドラッグで手動調整可能</div>
+  </div>
+</header>
+
+<div class="app">
+
+  <!-- 点心祭バナー -->
+  <div class="festival-banner" id="festival-banner">
+    <div class="festival-label">
+      🥟 点心祭モード
+      <span class="festival-sub" id="festival-sub">OFF — 通常キャパシティで配置します</span>
+    </div>
+    <span class="toggle-status" id="festival-stxt">OFF</span>
+    <label class="toggle">
+      <input type="checkbox" id="festival-toggle" onchange="toggleFestival()">
+      <div class="toggle-track"></div>
+      <div class="toggle-thumb"></div>
+    </label>
+  </div>
+
+  <!-- OCR + 手動入力 -->
+  <div class="top-section">
+
+    <!-- 写真読み取りパネル -->
+    <div class="ocr-panel">
+      <h3>📷 予約表写真から読み取る</h3>
+      <div class="ocr-drop-zone" id="ocr-drop-zone">
+        <input type="file" id="ocr-file" accept="image/*" onchange="onFileSelect(event)">
+        <div class="ocr-drop-text">
+          <strong>写真をドロップ または クリックして選択</strong>
+          JPG / PNG など対応 · Claude AIで自動解析
+        </div>
+      </div>
+      <img id="ocr-preview" class="ocr-preview">
+      <div class="ocr-status" id="ocr-status"></div>
+      <div id="ocr-result-list"></div>
+      <div style="margin-top:8px;display:flex;gap:8px">
+        <button class="btn-primary" id="ocr-import-btn" onclick="importOcrResults()" style="display:none">✅ チェックした予約を追加</button>
+        <button class="btn-secondary" id="ocr-reset-btn" onclick="resetOcr()" style="display:none">リセット</button>
+      </div>
+    </div>
+
+    <!-- 手動入力パネル -->
+    <div class="panel">
+      <h3>✏️ 予約を手動追加</h3>
+      <div class="name-row"><label>お名前</label><input type="text" id="inp-name" placeholder="例：田中様"></div>
+      <div class="time-row"><label>来店時刻</label><input type="time" id="inp-time" value="18:00"></div>
+      <div class="form-grid">
+        <div class="form-row"><label>大人</label><input type="number" id="inp-adult" value="2" min="0" max="20"></div>
+        <div class="form-row"><label>小学生</label><input type="number" id="inp-child" value="0" min="0" max="10"></div>
+        <div class="form-row"><label>幼児(3歳超)</label><input type="number" id="inp-toddler" value="0" min="0" max="10"></div>
+        <div class="form-row"><label>3歳以下</label><input type="number" id="inp-infant" value="0" min="0" max="10"></div>
+      </div>
+      <div class="add-btn-row"><button class="btn-primary" onclick="addReservation()">+ 予約を追加</button></div>
+      <div id="add-error" style="margin-top:6px;font-size:11px;color:#dc2626;display:none"></div>
+      <div class="hint-box" id="cap-hint"></div>
+    </div>
+  </div>
+
+  <!-- 予約リスト + スケジュールボタン -->
+  <div class="panel">
+    <h3>予約リスト</h3>
+    <div class="reservations-list" id="res-list"></div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn-primary" onclick="autoSchedule()" style="flex:1">⚡ 自動スケジュール</button>
+      <button class="btn-secondary" onclick="clearAll()">リセット</button>
+    </div>
+  </div>
+
+  <div class="stats-row" id="stats-row" style="display:none"></div>
+  <div id="error-area"></div>
+
+  <div class="schedule-section" id="schedule-section" style="display:none">
+    <div class="schedule-header">
+      <h3>テーブル配置スケジュール<span class="cap-badge" id="festival-badge" style="display:none">点心祭モード</span></h3>
+      <button class="btn-secondary" onclick="exportSchedule()">📥 エクスポート</button>
+    </div>
+    <div class="drag-hint">バーをドラッグ＆ドロップで手動調整（30分刻み）</div>
+    <div class="sofa-notice" id="sofa-notice">⚠ ソファ席以外に配置された3歳以下のお子様がいる組があります（点線枠）。手動で移動するかスタッフにご確認ください。</div>
+    <div class="timeline-wrap">
+      <div class="timeline" id="timeline"></div>
+    </div>
+  </div>
+
+  <div class="unplaced-section" id="unplaced-section"
+    ondragover="dovUnplaced(event)" ondragleave="dlvUnplaced()" ondrop="ddropUnplaced(event)"
+    style="display:none">
+    <h3>⚠ 配置できなかった予約 <span style="font-size:10px;font-weight:400;color:#9ca3af">← ここにドロップするとスケジュールから外せます</span></h3>
+    <div id="bottleneck-msg" style="font-size:11px;color:#6b7280;margin-bottom:4px"></div>
+    <div class="unplaced-list" id="unplaced-list"></div>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+//  テーブル定義
+//  隣接（結合可能）ペア — フロアマップ確定版
+//  上列左 : 12↔11↔10
+//  上列右 : 9↔8↔7↔6  ※10-9はセパレータで不可
+//  中央   : T21,22,23,24 は全て単独のみ（縦横ともにパーティション）
+//  下中央 : 1↔2
+//  右列   : 5↔4 のみ  ※4-3は障害物で不可
+//  単独   : 3, 13, 25, 21, 22, 23, 24
+// ══════════════════════════════════════════════════════════════
+const TABLES=[
+  {id:4, baseCap:2,sofa:false,group:'2名掛け'},
+  {id:5, baseCap:2,sofa:false,group:'2名掛け'},
+  {id:6, baseCap:2,sofa:true, group:'2名掛け'},
+  {id:7, baseCap:2,sofa:true, group:'2名掛け'},
+  {id:10,baseCap:2,sofa:false,group:'2名掛け'},
+  {id:1, baseCap:4,sofa:false,group:'4名掛け'},
+  {id:2, baseCap:4,sofa:false,group:'4名掛け'},
+  {id:8, baseCap:4,sofa:true, group:'4名掛け'},
+  {id:9, baseCap:4,sofa:true, group:'4名掛け'},
+  {id:11,baseCap:4,sofa:true, group:'4名掛け'},
+  {id:12,baseCap:4,sofa:true, group:'4名掛け'},
+  {id:21,baseCap:4,sofa:false,group:'4名掛け'},
+  {id:22,baseCap:4,sofa:false,group:'4名掛け'},
+  {id:23,baseCap:4,sofa:false,group:'4名掛け'},
+  {id:24,baseCap:4,sofa:false,group:'4名掛け'},
+  {id:3, baseCap:6,sofa:false,group:'6名掛け'},
+  {id:13,baseCap:6,sofa:false,group:'6名掛け'},
+  {id:25,baseCap:6,sofa:false,group:'6名掛け'},
+];
+const TMAP={};
+TABLES.forEach(t=>TMAP[t.id]=t);
+
+// 隣接グラフ（確定版：T21-24は全て単独）
+const ADJ={
+  12:[11], 11:[12,10], 10:[11],
+  9:[8],   8:[9,7],    7:[8,6],  6:[7],
+  1:[2],   2:[1],
+  5:[4],   4:[5],
+  3:[],13:[],25:[],21:[],22:[],23:[],24:[],
+};
+
+function isConnected(ids){
+  if(ids.length===1)return true;
+  const set=new Set(ids),vis=new Set([ids[0]]),q=[ids[0]];
+  while(q.length){
+    const c=q.shift();
+    for(const nb of(ADJ[c]||[]))if(set.has(nb)&&!vis.has(nb)){vis.add(nb);q.push(nb);}
+  }
+  return vis.size===ids.length;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  点心祭モード
+// ══════════════════════════════════════════════════════════════
+let festivalMode=false;
+
+// 自動配置用キャパ（点心祭モードで2名掛け・4名掛けのみ-1、6名掛けは変更なし）
+function getCap(tid){
+  const t=TMAP[tid];
+  if(!festivalMode) return t.baseCap;
+  if(t.baseCap===6) return 6; // 6名掛けは変更なし
+  return Math.max(1,t.baseCap-1);
+}
+// 手動ドラッグ用キャパ（常に通常キャパ）
+function getCapForDrag(tid){return TMAP[tid].baseCap;}
+
+function toggleFestival(){
+  festivalMode=document.getElementById('festival-toggle').checked;
+  const on=festivalMode;
+  document.getElementById('festival-banner').classList.toggle('active',on);
+  document.getElementById('festival-sub').textContent=on
+    ?'ON — 各テーブルのキャパシティが1名減少（2→1 / 4→3 / 6→5）'
+    :'OFF — 通常キャパシティで配置します';
+  document.getElementById('festival-stxt').textContent=on?'ON':'OFF';
+  document.getElementById('festival-badge').style.display=on?'inline':'none';
+  updateCapHint();
+  if(placements.length>0)autoSchedule();
+}
+
+function updateCapHint(){
+  document.getElementById('cap-hint').innerHTML=`
+    <strong>有効キャパシティ${festivalMode?' <span style="color:#854F0B">[点心祭]</span>':''}</strong><br>
+    2名掛: ${festivalMode?'1名':'2名'} / 4名掛: ${festivalMode?'3名':'4名'} / 6名掛: ${festivalMode?'5名':'6名'}<br><br>
+    <strong>配置優先順位</strong><br>
+    ① 1テーブルで収まる（余り最小）<br>
+    ② 最小テーブル数の連結で収まる<br>
+    ③ 全て埋まっている場合は3テーブル以上も使用<br><br>
+    <strong>結合可能ペア</strong><br>
+    上列左: T12↔T11↔T10 / 上列右: T9↔T8↔T7↔T6<br>
+    下中央: T1↔T2 / 右列: T5↔T4<br>
+    単独のみ: T3・T13・T25・T21・T22・T23・T24`;
+}
+updateCapHint();
+
+// ══════════════════════════════════════════════════════════════
+//  定数・状態
+// ══════════════════════════════════════════════════════════════
+const SLOT_START=17*60,SLOT_END=21*60+30,DURATION=90,OCCUPY=120,MAX_G=50;
+const COLORS=['c1','c2','c3','c4','c5','c6','c7','c8'];
+let reservations=[],placements=[],unplaced=[],uid=1;
+
+const toMin=t=>{const[h,m]=t.split(':').map(Number);return h*60+m;};
+const toTime=m=>`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+
+// ══════════════════════════════════════════════════════════════
+//  空き確認
+// ══════════════════════════════════════════════════════════════
+function freeAt(tids,s,oe,exId=null){
+  for(const tid of tids)
+    if(placements.some(p=>p.resId!==exId&&p.tableIds.includes(tid)&&!(p.occupyEnd<=s||p.startMin>=oe)))
+      return false;
+  return true;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  テーブル選択ロジック（改訂版）
+//
+//  3歳以下がいる場合：
+//  　「3歳以下の人数 ≤ ソファテーブルのキャパ÷2」を満たすソファテーブルを
+//  　1つ含み、残りは通常テーブルで足りる連結を探す
+//  　例）大人8名+3歳以下1名 → ソファ付き4人掛け(ソファ容量2)1台+通常4人掛け2台
+//
+//  3歳以下がいない場合：
+//  　最小テーブル数・余り最小の連結を探す
+// ══════════════════════════════════════════════════════════════
+//  全体最適スケジューリング
+//
+//  スコアリング（低いほど優先）：
+//  余り(cap-need)×1 + テーブル数×4 + ソファ浪費ペナルティ20
+//  処理順：①3歳以下あり → ②大人数(7名以上) → ③中小人数
+// ══════════════════════════════════════════════════════════════
+function sofaCap(tid){ return Math.floor(getCap(tid)/2); }
+
+function scoreCombo(combo, needsSofa){
+  // ソファ不要な組がソファ席を使う場合のペナルティ
+  // ただし小さいテーブルを強く優先するため、ペナルティは小さめに
+  const sofaWaste = (!needsSofa && combo.hasSofa) ? 3 : 0;
+  // baseCap合計：小さいテーブルを強く優先（2名掛け < 4名掛け < 6名掛け）
+  const baseCapTotal = combo.tableIds.reduce((s,id)=>s+TMAP[id].baseCap, 0);
+  // テーブル数ペナルティ（複数テーブルを避ける）
+  return baseCapTotal * 2 + combo.count * 4 + sofaWaste;
+}
+
+function findBestAssignment(need, infantCount, s, oe, exId=null, useBaseCap=false){
+  const needsSofa = infantCount > 0;
+  const capFn = useBaseCap ? getCapForDrag : getCap;
+  const freeTids  = new Set(TABLES.filter(t=>freeAt([t.id],s,oe,exId)).map(t=>t.id));
+
+  const found = new Map();
+  function expand(ids){
+    const key=[...ids].sort((a,b)=>a-b).join(',');
+    if(found.has(key))return;
+    const cap          = ids.reduce((a,id)=>a+capFn(id),0);
+    const hasSofa      = ids.some(id=>TMAP[id].sofa);
+    const sofaCapTotal = ids.filter(id=>TMAP[id].sofa).reduce((a,id)=>a+sofaCap(id),0);
+    if(isConnected(ids)){
+      found.set(key,{tableIds:[...ids],cap,hasSofa,sofaCapTotal,excess:cap-need,count:ids.length});
+    }
+    if(ids.length>=6||cap>=need+10)return;
+    const nbs=new Set();
+    ids.forEach(id=>(ADJ[id]||[]).forEach(nb=>{
+      if(!ids.includes(nb)&&freeTids.has(nb))nbs.add(nb);
+    }));
+    nbs.forEach(nb=>expand([...ids,nb]));
+  }
+  TABLES.filter(t=>freeTids.has(t.id)).forEach(t=>expand([t.id]));
+
+  const valid = [...found.values()].filter(c=>c.cap>=need);
+  if(!valid.length) return null;
+
+  if(needsSofa){
+    const sofaOk = valid.filter(c=>c.hasSofa && c.sofaCapTotal>=infantCount);
+    if(sofaOk.length>0){
+      sofaOk.sort((a,b)=>scoreCombo(a,true)-scoreCombo(b,true));
+      return {...sofaOk[0], sofaWarning:false};
+    }
+    const sofaAny = valid.filter(c=>c.hasSofa);
+    const pool = sofaAny.length>0 ? sofaAny : valid;
+    pool.sort((a,b)=>scoreCombo(a,true)-scoreCombo(b,true));
+    return {...pool[0], sofaWarning:true};
+  }
+
+  valid.sort((a,b)=>scoreCombo(a,false)-scoreCombo(b,false));
+  return {...valid[0], sofaWarning:false};
+}
+
+// ══════════════════════════════════════════════════════════════
+//  自動スケジュール
+//  点心祭モード：まず祭キャパで試行 → 入らなければ通常キャパで詰め込み（⚠詰 表示）
+//  全配置後に改善パスを実行：余りが大きい組をより小さいテーブルに再割り当て
+// ══════════════════════════════════════════════════════════════
+function autoSchedule(){
+  document.getElementById('error-area').innerHTML='';
+  placements=[];unplaced=[];
+
+  const byTime=(a,b)=>a.startMin-b.startMin||(b.total-a.total);
+  const infantGroups = [...reservations].filter(r=>r.infant>0).sort(byTime);
+  const largeGroups  = [...reservations].filter(r=>r.infant===0&&r.total>=7).sort(byTime);
+  const smallGroups  = [...reservations].filter(r=>r.infant===0&&r.total<7).sort(byTime);
+  const order = [...infantGroups,...largeGroups,...smallGroups];
+
+  let hasOverCap = false;
+
+  // ── 第1パス：通常の貪欲配置 ──────────────────────────────
+  for(const res of order){
+    let result = findBestAssignment(res.total, res.infant, res.startMin, res.occupyEnd, null, false);
+    let overCap = false;
+    if(!result && festivalMode){
+      result = findBestAssignment(res.total, res.infant, res.startMin, res.occupyEnd, null, true);
+      if(result){ overCap=true; hasOverCap=true; }
+    }
+    if(!result){
+      unplaced.push(res);
+    } else {
+      placements.push({
+        resId:res.id, tableIds:result.tableIds,
+        startMin:res.startMin, endMin:res.endMin, occupyEnd:res.occupyEnd,
+        sofaWarning: result.sofaWarning&&res.needsSofa,
+        overCap,
+      });
+    }
+  }
+
+  // ── 改善パス：余りが大きい組をより良いテーブルへ再割り当て ──
+  // 改善がなくなるまで最大10回繰り返す
+  for(let pass=0; pass<10; pass++){
+    let improved = false;
+
+    // baseCap合計が大きい順（無駄が大きい組から優先して見直し）
+    const sorted = [...placements].sort((a,b)=>{
+      const capA = a.tableIds.reduce((s,id)=>s+TMAP[id].baseCap,0);
+      const capB = b.tableIds.reduce((s,id)=>s+TMAP[id].baseCap,0);
+      return capB - capA;
+    });
+
+    for(const pl of sorted){
+      const res = reservations.find(r=>r.id===pl.resId);
+      if(!res) continue;
+
+      const currentScore = scoreCombo(
+        {tableIds:pl.tableIds, cap:pl.tableIds.reduce((s,id)=>s+getCap(id),0),
+         hasSofa:pl.tableIds.some(id=>TMAP[id].sofa),
+         excess:pl.tableIds.reduce((s,id)=>s+getCap(id),0)-res.total, count:pl.tableIds.length},
+        res.infant>0
+      );
+
+      // 自分のテーブルを解放した状態で再探索
+      const better = findBestAssignment(
+        res.total, res.infant, res.startMin, res.occupyEnd,
+        pl.resId, // 自分自身を除外してテーブルを解放
+        false
+      );
+      if(!better) continue;
+
+      const betterScore = scoreCombo(better, res.infant>0);
+
+      if(betterScore < currentScore){
+        pl.tableIds = better.tableIds;
+        pl.sofaWarning = better.sofaWarning && res.needsSofa;
+        pl.overCap = false;
+        improved = true;
+      }
+    }
+
+    if(!improved) break;
+  }
+
+  // overCapの最終チェック
+  hasOverCap = placements.some(p=>p.overCap);
+
+  if(hasOverCap){
+    document.getElementById('error-area').innerHTML=`
+      <div style="background:#fffbeb;border:1px solid #fcd34d;color:#92400e;padding:10px 14px;border-radius:8px;font-size:12px">
+        ⚠ 点心祭モードの推奨キャパを超えて詰め込んだ組があります（バーに <strong>⚠詰</strong> と表示）。必要に応じて手動で調整してください。
+      </div>`;
+  }
+
+  renderSchedule();renderStats();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  予約管理
+// ══════════════════════════════════════════════════════════════
+function addReservation(){
+  const name=document.getElementById('inp-name').value.trim()||`予約${uid}`;
+  const ts=document.getElementById('inp-time').value;
+  const a=+document.getElementById('inp-adult').value||0;
+  const c=+document.getElementById('inp-child').value||0;
+  const td=+document.getElementById('inp-toddler').value||0;
+  const inf=+document.getElementById('inp-infant').value||0;
+  const total=a+c+td+inf;
+  const err=document.getElementById('add-error');
+  if(!ts){err.textContent='来店時刻を入力してください';err.style.display='block';return;}
+  const sm=toMin(ts);
+  if(sm<SLOT_START||sm>SLOT_END-30){err.textContent='17:00〜21:30の範囲で入力してください';err.style.display='block';return;}
+  if(total===0){err.textContent='人数を入力してください';err.style.display='block';return;}
+  err.style.display='none';
+  pushReservation({name,startMin:sm,total,adult:a,child:c,toddler:td,infant:inf});
+  document.getElementById('inp-name').value='';
+  renderList();
+}
+
+function pushReservation({name,startMin,total,adult,child,toddler,infant}){
+  reservations.push({
+    id:uid++,name,startMin,endMin:startMin+DURATION,occupyEnd:startMin+OCCUPY,
+    total,adult,child,toddler,infant,needsSofa:infant>0,colorIdx:(uid-2)%8
+  });
+}
+
+function removeRes(id){reservations=reservations.filter(r=>r.id!==id);renderList();}
+
+function renderList(){
+  const el=document.getElementById('res-list');
+  if(!reservations.length){
+    el.innerHTML='<div style="font-size:11px;color:#9ca3af;padding:8px">予約はありません</div>';
+    return;
+  }
+  el.innerHTML=reservations.map(r=>`
+    <div class="res-item">
+      <div class="res-badge ${COLORS[r.colorIdx]}" style="border-radius:4px">${toTime(r.startMin)}</div>
+      <span class="res-name">${r.name}</span>
+      <span class="res-detail">${r.total}名${r.needsSofa?' 🍼':''}</span>
+      <button class="btn-danger" onclick="removeRes(${r.id})">削除</button>
+    </div>`).join('');
+}
+
+function clearAll(){
+  reservations=[];placements=[];unplaced=[];uid=1;
+  renderList();
+  ['schedule-section','unplaced-section','stats-row'].forEach(id=>document.getElementById(id).style.display='none');
+  document.getElementById('error-area').innerHTML='';
+  resetOcr();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  グリッド線
+// ══════════════════════════════════════════════════════════════
+function buildGridLines(slots,SW){
+  let g='';
+  for(let i=1;i<slots;i++){
+    const min=SLOT_START+i*30;
+    const isHour=min%60===0;
+    g+=`<div class="grid-line${isHour?' grid-line-hour':''}" style="left:${i*SW}px"></div>`;
+  }
+  return g;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  スケジュール描画
+// ══════════════════════════════════════════════════════════════
+function renderSchedule(){
+  document.getElementById('schedule-section').style.display='block';
+  const tl=document.getElementById('timeline');
+  const SW=60,LW=165,slots=(SLOT_END-SLOT_START)/30;
+
+  let h='<div class="time-axis">';
+  for(let m=SLOT_START;m<=SLOT_END;m+=30)
+    h+=`<div class="time-slot-hdr">${toTime(m)}</div>`;
+  h+='</div><div class="table-rows">';
+
+  ['2名掛け','4名掛け','6名掛け'].forEach((g,gi)=>{
+    if(gi)h+=`<div class="sep-row"></div>`;
+    h+=`<div class="grp-label" style="padding-left:${LW}px">${g}</div>`;
+    TABLES.filter(t=>t.group===g).forEach(t=>{
+      const cap=getCap(t.id);
+      const capLbl=festivalMode?`${cap}名(祭)`:`${cap}名`;
+      const rel=placements.filter(p=>p.tableIds.includes(t.id));
+      h+=`<div class="table-row" data-table="${t.id}">
+        <div class="table-label">
+          <span class="table-label-name">T${t.id}</span>
+          <div class="table-label-tags">
+            <span class="tag tag-${t.baseCap}p">${capLbl}</span>
+            ${t.sofa?'<span class="tag tag-sofa">ソファ</span>':''}
+          </div>
+        </div>
+        <div class="table-track" id="track-${t.id}" style="width:${slots*SW}px"
+          ondragover="dov(event,this)" ondragleave="dlv(this)" ondrop="ddrop(event,this)">
+          ${buildGridLines(slots,SW)}`;
+      rel.forEach(p=>{
+        const res=reservations.find(r=>r.id===p.resId);if(!res)return;
+        const left=((p.startMin-SLOT_START)/30)*SW, w=(DURATION/30)*SW;
+        const lbl=p.tableIds.length>1?` [T${p.tableIds.join('+')}]`:'';
+        const dn=res.name.length>5?res.name.slice(0,4)+'…':res.name;
+        const warnCls=p.sofaWarning?'sofa-warn':p.overCap?'over-cap-warn':'';
+        const warnIcon=p.sofaWarning?' ⚠':p.overCap?' ⚠詰':'';
+        const fallbackLbl=p.festivalFallback?' [通常]':'';
+        h+=`<div class="res-bar ${COLORS[res.colorIdx]} ${warnCls}"
+          data-res-id="${p.resId}"
+          style="left:${left}px;width:${w}px;z-index:3" draggable="true"
+          onmouseenter="tip(event,${p.resId})" onmouseleave="htip()"
+          ondragstart="ds(event,${p.resId})" ondragend="de(event)">
+          ${dn}${lbl}${warnIcon}${fallbackLbl}</div>`;
+      });
+      h+='</div></div>';
+    });
+  });
+  h+='</div>';
+  tl.innerHTML=h;
+  document.getElementById('sofa-notice').style.display=
+    placements.some(p=>p.sofaWarning)?'block':'none';
+  renderUnplaced();
+}
+
+function renderUnplaced(){
+  const sec=document.getElementById('unplaced-section');
+  // スケジュール済みがあれば常に表示（ドロップゾーンとして機能させるため）
+  if(!placements.length&&!unplaced.length){sec.style.display='none';return;}
+  sec.style.display='block';
+  document.getElementById('bottleneck-msg').innerHTML=unplaced.length
+    ? unplaced.map(r=>
+        r.needsSofa
+          ?`• ${r.name}（${r.total}名）: ソファ付きテーブルの空きなし`
+          :`• ${r.name}（${r.total}名）: 収容できるテーブルの空きなし`
+      ).join('<br>')
+    : '<span style="color:#9ca3af;font-size:10px">現在、未配置の予約はありません</span>';
+  document.getElementById('unplaced-list').innerHTML=unplaced.map(r=>`
+    <div class="unplaced-bar ${COLORS[r.colorIdx]}" draggable="true"
+      onmouseenter="tip(event,${r.id})" onmouseleave="htip()"
+      ondragstart="ds(event,${r.id})" ondragend="de(event)">
+      ${r.name} ${r.total}名 (${toTime(r.startMin)})
+    </div>`).join('');
+}
+
+function renderStats(){
+  const el=document.getElementById('stats-row');el.style.display='flex';
+  el.innerHTML=`
+    <div class="stat-card"><div class="val">${reservations.length}</div><div class="lbl">予約件数</div></div>
+    <div class="stat-card"><div class="val">${reservations.reduce((s,r)=>s+r.total,0)}</div><div class="lbl">来客総数</div></div>
+    <div class="stat-card"><div class="val" style="color:${unplaced.length?'#dc2626':'inherit'}">${placements.length}</div><div class="lbl">配置済み</div></div>
+    <div class="stat-card"><div class="val" style="color:${unplaced.length?'#dc2626':'inherit'}">${unplaced.length}</div><div class="lbl">未配置</div></div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  ドラッグ＆ドロップ（30分スナップ）
+// ══════════════════════════════════════════════════════════════
+let dragId=null;
+// ══════════════════════════════════════════════════════════════
+//  未配置エリアへのドロップ（スケジュールから外す）
+// ══════════════════════════════════════════════════════════════
+function dovUnplaced(e){
+  e.preventDefault();
+  document.getElementById('unplaced-section').style.borderColor='#3b82f6';
+  document.getElementById('unplaced-section').style.background='#eff6ff';
+}
+function dlvUnplaced(){
+  document.getElementById('unplaced-section').style.borderColor='#fca5a5';
+  document.getElementById('unplaced-section').style.background='#fff';
+}
+function ddropUnplaced(e){
+  e.preventDefault();
+  dlvUnplaced();
+  if(dragId===null)return;
+  // すでに未配置なら何もしない
+  if(unplaced.some(u=>u.id===dragId))return;
+  // placementsから削除してunplacedに移動
+  placements=placements.filter(p=>p.resId!==dragId);
+  const res=reservations.find(r=>r.id===dragId);
+  if(res&&!unplaced.some(u=>u.id===dragId)){
+    unplaced.push(res);
+  }
+  dragId=null;
+  renderSchedule();renderStats();
+}
+
+function ds(e,id){dragId=id;e.dataTransfer.effectAllowed='move';e.target.classList.add('dragging');}
+function de(e){e.target&&e.target.classList.remove('dragging');dragId=null;}
+function dov(e,tr){e.preventDefault();tr.style.background='#eff6ff';}
+function dlv(tr){tr.style.background='#f9fafb';}
+
+function ddrop(e,tr){
+  e.preventDefault();tr.style.background='#f9fafb';
+  if(dragId===null)return;
+  const res=reservations.find(r=>r.id===dragId);if(!res)return;
+  const tid=parseInt(tr.closest('.table-row').dataset.table);
+  const tbl=TMAP[tid];if(!tbl)return;
+  const rect=tr.getBoundingClientRect();
+  const ns=SLOT_START+Math.floor((e.clientX-rect.left)/60)*30;
+  const ne=ns+DURATION,noe=ns+OCCUPY;
+  if(ns<SLOT_START||ne>SLOT_END+60){stip('この時間帯には移動できません');return;}
+
+  // ソファ警告計算
+  const calcSofaWarn=(tids)=>{
+    if(res.infant<=0) return false;
+    const totalSofaCap=tids.filter(id=>TMAP[id].sofa).reduce((a,id)=>a+sofaCap(id),0);
+    return totalSofaCap < res.infant;
+  };
+
+  // ドロップ先を含む空きテーブルセット（自分自身の現在位置は解放済みとして扱う）
+  const freeTids=new Set(
+    TABLES.filter(t=>freeAt([t.id],ns,noe,dragId)).map(t=>t.id)
+  );
+  // ドロップ先が他の予約で埋まっている場合は弾く
+  if(!freeTids.has(tid)){stip('このテーブルはこの時間帯に他の予約があります');return;}
+
+  // BFSでtidを含む全連結組み合わせを列挙（ドラッグ時は常に通常キャパ使用）
+  const found=new Map();
+  function exp(ids){
+    const key=[...ids].sort((a,b)=>a-b).join(',');
+    if(found.has(key))return;
+    const cap=ids.reduce((a,id)=>a+getCapForDrag(id),0);
+    const hasSofa=ids.some(id=>TMAP[id].sofa);
+    const sofaCapTotal=ids.filter(id=>TMAP[id].sofa).reduce((a,id)=>a+sofaCap(id),0);
+    if(isConnected(ids)&&ids.includes(tid))
+      found.set(key,{tableIds:[...ids],cap,hasSofa,sofaCapTotal,excess:cap-res.total,count:ids.length});
+    if(ids.length>=6||cap>=res.total+12)return;
+    const nbs=new Set();
+    ids.forEach(id=>(ADJ[id]||[]).forEach(nb=>{
+      if(!ids.includes(nb)&&freeTids.has(nb))nbs.add(nb);
+    }));
+    nbs.forEach(nb=>exp([...ids,nb]));
+  }
+  exp([tid]);
+
+  let valid=[...found.values()].filter(c=>c.cap>=res.total);
+  if(!valid.length){
+    stip(`T${tid}周辺の空きテーブルを結合しても${res.total}名を収容できません`);return;
+  }
+
+  // ソファが必要な場合はソファ容量を満たすものを優先
+  let targetCombo;
+  if(res.infant>0){
+    const sofaOk=valid.filter(c=>c.hasSofa&&c.sofaCapTotal>=res.infant);
+    valid=sofaOk.length>0?sofaOk:valid;
+  }
+  // テーブル数最小 → 余り最小
+  valid.sort((a,b)=>a.count-b.count||a.excess-b.excess);
+  targetCombo=valid[0];
+
+  const targetIds=targetCombo.tableIds;
+  const sofaWarn=calcSofaWarn(targetIds);
+
+  // 複数テーブルに自動拡張した場合はツールチップで通知
+  if(targetIds.length>1){
+    stip(`T${targetIds.join('+')}に配置しました`);
+  }
+
+  applyPlace(dragId,targetIds,ns,ne,noe,sofaWarn);
+  if(sofaWarn)stip('⚠ ソファ容量が不足しています。ご確認ください。');
+  renderSchedule();renderStats();
+}
+
+function applyPlace(resId,tids,s,e2,oe,sofaWarn=false){
+  const res=reservations.find(r=>r.id===resId);
+  res.startMin=s;res.endMin=e2;res.occupyEnd=oe;
+  const ex=placements.find(p=>p.resId===resId);
+  if(ex){ex.tableIds=tids;ex.startMin=s;ex.endMin=e2;ex.occupyEnd=oe;ex.sofaWarning=sofaWarn&&res.infant>0;}
+  else{
+    placements.push({resId,tableIds:tids,startMin:s,endMin:e2,occupyEnd:oe,sofaWarning:sofaWarn&&res.infant>0});
+    unplaced=unplaced.filter(u=>u.id!==resId);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  ツールチップ
+// ══════════════════════════════════════════════════════════════
+function tip(e,id){
+  const res=reservations.find(r=>r.id===id);if(!res)return;
+  const pl=placements.find(p=>p.resId===id);
+  const t=document.getElementById('tooltip');
+  const multi=pl&&pl.tableIds.length>1?`（${pl.tableIds.length}テーブル結合）`:'';
+  const sofaAlert=pl&&pl.sofaWarning?'<br>⚠ ソファ席以外に配置中':'';
+  const overCapAlert=pl&&pl.overCap?'<br>⚠詰 点心祭キャパを超えて詰め込み中':'';
+  t.innerHTML=`<strong>${res.name}</strong><br>${res.total}名${res.needsSofa?' 🍼 ソファ推奨':''}<br>
+    ${toTime(res.startMin)}〜${toTime(res.endMin)}<br>
+    ${pl?'T'+pl.tableIds.join('+T'):'未配置'} ${multi}${sofaAlert}${overCapAlert}`;
+  t.style.display='block';t.style.left=(e.clientX+12)+'px';t.style.top=(e.clientY-10)+'px';
+}
+function htip(){document.getElementById('tooltip').style.display='none';}
+function stip(msg){
+  const t=document.getElementById('tooltip');
+  t.innerHTML='⚠️ '+msg;t.style.display='block';
+  setTimeout(()=>t.style.display='none',2500);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  エクスポート
+// ══════════════════════════════════════════════════════════════
+function exportSchedule(){
+  let txt=`テーブル配置スケジュール${festivalMode?' [点心祭モード]':''}\n\n`;
+  placements.forEach(p=>{
+    const r=reservations.find(x=>x.id===p.resId);if(!r)return;
+    const multi=p.tableIds.length>1?` (${p.tableIds.length}テーブル結合)`:'';
+    txt+=`${r.name} | ${r.total}名 | ${toTime(p.startMin)}-${toTime(p.endMin)} | T${p.tableIds.join('+T')}${multi}\n`;
+  });
+  if(unplaced.length){
+    txt+='\n--- 未配置 ---\n';
+    unplaced.forEach(r=>txt+=`${r.name} | ${r.total}名 | ${toTime(r.startMin)}\n`);
+  }
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([txt],{type:'text/plain;charset=utf-8'}));
+  a.download='schedule.txt';a.click();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  OCR — 写真から予約読み取り（Claude API）
+// ══════════════════════════════════════════════════════════════
+let ocrResults=[];
+
+// ▼▼▼ Cloudflare WorkerのURLをここに設定してください ▼▼▼
+const PROXY_URL = 'https://ocr-proxy.g504-aniki-gera.workers.dev';
+// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+const dropZone=document.getElementById('ocr-drop-zone');
+dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('drag-over');});
+dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop',e=>{
+  e.preventDefault();dropZone.classList.remove('drag-over');
+  const f=e.dataTransfer.files[0];if(f)processOcrFile(f);
+});
+
+function onFileSelect(e){
+  const f=e.target.files[0];if(f)processOcrFile(f);
+}
+
+// 画像リサイズ（長辺maxPx以内のJPEGに変換してbase64返す）
+function resizeImage(dataUrl,maxPx,quality){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>{
+      let w=img.width,h=img.height;
+      if(w>maxPx||h>maxPx){
+        if(w>=h){h=Math.round(h*maxPx/w);w=maxPx;}
+        else{w=Math.round(w*maxPx/h);h=maxPx;}
+      }
+      const canvas=document.createElement('canvas');
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      resolve(canvas.toDataURL('image/jpeg',quality).split(',')[1]);
+    };
+    img.onerror=reject;
+    img.src=dataUrl;
+  });
+}
+
+function processOcrFile(file){
+  const preview=document.getElementById('ocr-preview');
+  const status=document.getElementById('ocr-status');
+  const resultList=document.getElementById('ocr-result-list');
+  const importBtn=document.getElementById('ocr-import-btn');
+  const resetBtn=document.getElementById('ocr-reset-btn');
+
+  const reader=new FileReader();
+  reader.onload=async ev=>{
+    preview.src=ev.target.result;preview.style.display='block';
+    status.className='ocr-status loading';
+    status.innerHTML='<span class="spinner"></span>予約表を解析中… しばらくお待ちください';
+    status.style.display='block';
+    resultList.style.display='none';
+    importBtn.style.display='none';
+    resetBtn.style.display='none';
+    ocrResults=[];
+
+    // 長辺1500px以内にリサイズしてJPEGで送信（ペイロード削減）
+    let base64;
+    try{ base64=await resizeImage(ev.target.result,1500,0.85); }
+    catch(e){ base64=ev.target.result.split(',')[1]; }
+    const mimeType='image/jpeg';
+
+    const prompt=`これは「点心祭予約受付表」という飲食店の手書き予約表の写真です。
+
+【表の構造】
+表は6つのブロックに分かれており、各ブロックに時間帯が記載されています：
+- 「17:00〜18:30」ブロック → time: "17:00"
+- 「17:30〜19:00」ブロック → time: "17:30"
+- 「18:00〜19:30」ブロック → time: "18:00"
+- 「19:00〜20:30」ブロック → time: "19:00"
+- 「19:30〜21:00」ブロック → time: "19:30"
+- 「20:00〜21:30」ブロック → time: "20:00"
+
+【各ブロックの列構成（左から順）】
+1. 配卓（赤字でテーブル番号）
+2. お名前（〇〇様）
+3. 大人（adult）← 1〜2桁の数字
+4. 小学生（child）← 通常空欄か1桁
+5. 幼児（toddler）← 3歳超〜小学生未満、通常空欄か1桁
+6. 3歳以下（infant）← ご連絡先列の直前の細い1マス、空欄が多いが1が書いてある場合は必ず読む
+7. ご連絡先（電話番号）← 090-xxxx など長い数字、絶対に人数列と混同しない
+8. 案内済みチェック
+
+【キャンセル判定 — 厳密に守ること】
+- 行全体に横線（取り消し線）が引かれている → 必ず除外
+- お名前のセルに横線が引かれている → 必ず除外
+- 「キャンセル」「キャンセル」と書かれたラベルが付いている行 → 必ず除外
+- 上記に該当する行は人数が書いてあっても絶対に読み取らない
+- 名前の横や下に矢印・修正がある場合のみ有効な予約として扱う
+
+【数字の修正線について】
+- ある数字に横線を引いて上または下に別の数字を書き直している場合 → 新しい数字を採用
+- 例：大人欄の「4」に横線→「2」と書き直し → adult=2、child=0
+- 修正前の消された数字は絶対に使わない
+
+【列の対応 — ズレ厳禁】
+- 大人・小学生・幼児・3歳以下 の4列を左から順番通りに読む
+- 「3歳以下」に1が書いてあれば infant=1、幼児列が空欄なら toddler=0
+- 電話番号の数字を人数として読まない
+
+【出力形式】
+JSONのみ返してください（説明文・コードブロック・マークダウン一切不要）：
+[{"name":"〇〇様","time":"HH:MM","adult":数値,"child":数値,"toddler":数値,"infant":数値}]`;
+
+    try{
+      if(!PROXY_URL||PROXY_URL.includes('YOUR_WORKER')){
+        throw new Error('Cloudflare WorkerのURLが設定されていません。index.html内のPROXY_URLを設定してください。');
+      }
+      const resp=await fetch(PROXY_URL,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          model:'claude-sonnet-4-6',
+          max_tokens:4000,
+          messages:[{
+            role:'user',
+            content:[
+              {type:'image',source:{type:'base64',media_type:mimeType,data:base64}},
+              {type:'text',text:prompt}
+            ]
+          }]
+        })
+      });
+      const data=await resp.json();
+      // APIエラーチェック
+      if(data.error){throw new Error('APIエラー: '+JSON.stringify(data.error));}
+      if(!data.content||!data.content.length){throw new Error('APIレスポンス異常: '+JSON.stringify(data));}
+      const raw=data.content.map(c=>c.text||'').join('');
+      console.log('OCR raw response:', raw);
+      let parsed=null;
+      try{
+        const start=raw.indexOf('[');
+        const end=raw.lastIndexOf(']');
+        console.log('start:',start,'end:',end);
+        if(start!==-1&&end!==-1&&end>start){
+          const jsonStr=raw.slice(start,end+1)
+            .replace(/[\r\n\t]/g,' ')
+            .replace(/\s+/g,' ')
+            .trim();
+          console.log('jsonStr to parse:',jsonStr.slice(0,300));
+          parsed=JSON.parse(jsonStr);
+          console.log('parsed:',parsed,'length:',parsed.length);
+        }
+      }catch(e){
+        throw new Error('JSON解析エラー: '+e.message);
+      }
+      if(!parsed||!parsed.length)throw new Error('予約情報が見つかりませんでした');
+      ocrResults=parsed;
+
+      if(!ocrResults.length){
+        status.className='ocr-status error';
+        status.textContent='予約情報が見つかりませんでした。別の写真をお試しください。';
+        return;
+      }
+
+      status.className='ocr-status success';
+      status.textContent=`✅ ${ocrResults.length}件の予約を検出しました。追加する予約を選択してください。`;
+
+      resultList.style.display='block';
+      resultList.innerHTML=ocrResults.map((r,i)=>{
+        const total=(r.adult||0)+(r.child||0)+(r.toddler||0)+(r.infant||0);
+        return `<div class="ocr-result-item" style="flex-direction:column;align-items:flex-start;gap:4px;padding:8px 10px">
+          <div style="display:flex;align-items:center;gap:6px;width:100%">
+            <input type="checkbox" id="ocr-chk-${i}" checked>
+            <input type="text" value="${r.name}" id="ocr-name-${i}"
+              style="flex:1;padding:3px 6px;border:1px solid #d1d5db;border-radius:4px;font-size:12px;font-weight:500">
+            <span style="font-size:11px;color:#6b7280;white-space:nowrap">${total}名</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;width:100%;padding-left:22px">
+            <div style="display:flex;flex-direction:column;gap:2px;align-items:center">
+              <label style="font-size:9px;color:#6b7280">時刻</label>
+              <input type="text" value="${r.time}" id="ocr-time-${i}"
+                style="width:100%;padding:2px 4px;border:1px solid #d1d5db;border-radius:4px;font-size:11px;text-align:center">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:2px;align-items:center">
+              <label style="font-size:9px;color:#6b7280">大人</label>
+              <input type="number" value="${r.adult||0}" min="0" id="ocr-adult-${i}"
+                style="width:100%;padding:2px 4px;border:1px solid #d1d5db;border-radius:4px;font-size:11px;text-align:center">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:2px;align-items:center">
+              <label style="font-size:9px;color:#6b7280">小学生</label>
+              <input type="number" value="${r.child||0}" min="0" id="ocr-child-${i}"
+                style="width:100%;padding:2px 4px;border:1px solid #d1d5db;border-radius:4px;font-size:11px;text-align:center">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:2px;align-items:center">
+              <label style="font-size:9px;color:#6b7280">幼児</label>
+              <input type="number" value="${r.toddler||0}" min="0" id="ocr-toddler-${i}"
+                style="width:100%;padding:2px 4px;border:1px solid #d1d5db;border-radius:4px;font-size:11px;text-align:center">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:2px;align-items:center">
+              <label style="font-size:9px;color:#dc2626;font-weight:600">3歳以下</label>
+              <input type="number" value="${r.infant||0}" min="0" id="ocr-infant-${i}"
+                style="width:100%;padding:2px 4px;border:1px solid #fca5a5;border-radius:4px;font-size:11px;text-align:center;background:#fef2f2">
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+
+      importBtn.style.display='inline-flex';
+      resetBtn.style.display='inline-flex';
+
+    }catch(err){
+      status.className='ocr-status error';
+      status.textContent='エラー: '+err.message;
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function importOcrResults(){
+  let added=0;
+  ocrResults.forEach((r,i)=>{
+    const chk=document.getElementById(`ocr-chk-${i}`);
+    if(!chk||!chk.checked)return;
+    // フォームの編集値を使用（手動修正に対応）
+    const nameVal=(document.getElementById(`ocr-name-${i}`)?.value||r.name).trim();
+    const timeVal=(document.getElementById(`ocr-time-${i}`)?.value||r.time).trim();
+    const adult=parseInt(document.getElementById(`ocr-adult-${i}`)?.value)||0;
+    const child=parseInt(document.getElementById(`ocr-child-${i}`)?.value)||0;
+    const toddler=parseInt(document.getElementById(`ocr-toddler-${i}`)?.value)||0;
+    const infant=parseInt(document.getElementById(`ocr-infant-${i}`)?.value)||0;
+    const sm=toMin(timeVal);
+    if(isNaN(sm)||sm<SLOT_START||sm>SLOT_END-30)return;
+    pushReservation({
+      name:nameVal, startMin:sm,
+      total:adult+child+toddler+infant,
+      adult, child, toddler, infant
+    });
+    added++;
+  });
+  renderList();
+  const status=document.getElementById('ocr-status');
+  status.className='ocr-status success';
+  status.textContent=`✅ ${added}件の予約を追加しました。`;
+  document.getElementById('ocr-import-btn').style.display='none';
+}
+
+function resetOcr(){
+  ocrResults=[];
+  document.getElementById('ocr-preview').style.display='none';
+  document.getElementById('ocr-status').style.display='none';
+  document.getElementById('ocr-result-list').style.display='none';
+  document.getElementById('ocr-import-btn').style.display='none';
+  document.getElementById('ocr-reset-btn').style.display='none';
+  document.getElementById('ocr-file').value='';
+}
+</script>
+</body>
+</html>
